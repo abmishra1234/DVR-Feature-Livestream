@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Player</title>
+    <link href="https://vjs.zencdn.net/7.14.3/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.14.3/video.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls@3.6.5/dist/videojs-contrib-hls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-dash@5.0.2/dist/videojs-dash.min.js"></script>
+</head>
+<body>
+    <input type="file" id="videoFile" accept="video/mp4" />
+    <br><br>
+    <input type="text" id="streamUrl" placeholder="Enter live stream URL" />
+    <br><br>
+    <video id="videoPlayer" class="video-js vjs-default-skin" width="640" height="264" controls></video>
+    <br><br>
+    <button id="playButton">Play</button>
+    <button id="stopButton">Stop</button>
+    <div id="log"></div>
+
+    <script>
+        var videoPlayer = videojs('videoPlayer');
+        var playButton = document.getElementById('playButton');
+        var stopButton = document.getElementById('stopButton');
+        var streamUrlInput = document.getElementById('streamUrl');
+        var log = document.getElementById('log');
+
+        // Handle file selection
+        document.getElementById('videoFile').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            var url = URL.createObjectURL(file);
+            videoPlayer.src({ src: url, type: 'video/mp4' });
+            playButton.innerHTML = "Play";
+            videoPlayer.play();
+        });
+
+        // Handle live stream URL input
+        streamUrlInput.addEventListener('keydown', function(event) {
+            if (event.keyCode === 13) { // Enter key
+                var url = streamUrlInput.value;
+                if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoPlayer.src({ src: url, type: 'application/x-mpegURL' });
+                } else if (videoPlayer.canPlayType('application/dash+xml')) {
+                    videoPlayer.src({ src: url, type: 'application/dash+xml' });
+                } else {
+                    console.log('Unsupported stream format.');
+                    return;
+                }
+                videoPlayer.play();
+                playButton.innerHTML = "Pause";
+            }
+        });
+
+        // Handle play/pause button click
+        playButton.addEventListener('click', function() {
+            if (videoPlayer.paused()) {
+                videoPlayer.play();
+                playButton.innerHTML = "Pause";
+            } else {
+                videoPlayer.pause();
+                playButton.innerHTML = "Play";
+            }
+        });
+
+        // Handle stop button click
+        stopButton.addEventListener('click', function() {
+            videoPlayer.pause();
+            videoPlayer.currentTime(0);
+            playButton.innerHTML = "Play";
+        });
+
+        // Sync custom play/pause button with video player button
+        videoPlayer.on('play', function() {
+            playButton.innerHTML = "Pause";
+        });
+
+        videoPlayer.on('pause', function() {
+            playButton.innerHTML = "Play";
+        });
+
+        // Error handling
+        videoPlayer.on('error', function(event) {
+            console.log('An error occurred while playing the video.');
+            console.log(event);
+            logError(event.error);
+            playButton.innerHTML = "Play";
+        });
+
+        function logError(error) {
+            var errorMessage = '';
+            if (error.code) {
+                errorMessage += 'Error code: ' + error.code + '<br>';
+            }
+            if (error.message) {
+                errorMessage += 'Error message: ' + error.message + '<br>';
+            }
+            log.innerHTML = errorMessage;
+        }
+    </script>
+</body>
+</html>
