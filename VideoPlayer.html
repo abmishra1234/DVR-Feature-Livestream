@@ -16,86 +16,86 @@
     <br><br>
     <button id="playButton">Play</button>
     <button id="stopButton">Stop</button>
-    <div id="log"></div>
+    <div id="pauseTimer">
+        <span id="pauseTimerCaption">Paused Time:</span>
+        <br>
+        <span id="pauseTimerValue">00:00:00</span>
+    </div>
 
     <script>
         var videoPlayer = videojs('videoPlayer');
         var playButton = document.getElementById('playButton');
         var stopButton = document.getElementById('stopButton');
         var streamUrlInput = document.getElementById('streamUrl');
-        var log = document.getElementById('log');
+        var pauseTimerValue = document.getElementById('pauseTimerValue');
+        var pauseTimerInterval;
+        var pauseStartTime;
 
-        // Handle file selection
+        // Reset the pause timer
+        function resetPauseTimer() {
+            clearInterval(pauseTimerInterval);
+            pauseTimerValue.innerHTML = "00:00:00";
+            pauseTimerInterval = null; // Ensure to clear the interval reference
+        }
+
+        // Update pause timer
+        function updatePauseTimer() {
+            var currentTime = new Date();
+            var elapsedTime = currentTime - pauseStartTime;
+            var hours = Math.floor(elapsedTime / (1000 * 60 * 60));
+            var minutes = Math.floor((elapsedTime % (1000 * 60 * 60)) / (1000 * 60));
+            var seconds = Math.floor((elapsedTime % (1000 * 60)) / 1000);
+            hours = hours < 10 ? "0" + hours : hours;
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+            pauseTimerValue.innerHTML = hours + ":" + minutes + ":" + seconds;
+        }
+
         document.getElementById('videoFile').addEventListener('change', function(event) {
             var file = event.target.files[0];
             var url = URL.createObjectURL(file);
             videoPlayer.src({ src: url, type: 'video/mp4' });
-            playButton.innerHTML = "Play";
             videoPlayer.play();
         });
 
-        // Handle live stream URL input
         streamUrlInput.addEventListener('keydown', function(event) {
             if (event.keyCode === 13) { // Enter key
-                var url = streamUrlInput.value;
-                if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-                    videoPlayer.src({ src: url, type: 'application/x-mpegURL' });
-                } else if (videoPlayer.canPlayType('application/dash+xml')) {
-                    videoPlayer.src({ src: url, type: 'application/dash+xml' });
-                } else {
-                    console.log('Unsupported stream format.');
-                    return;
-                }
+                videoPlayer.src({ src: streamUrlInput.value, type: videoPlayer.canPlayType('application/vnd.apple.mpegurl') ? 'application/x-mpegURL' : 'application/dash+xml' });
                 videoPlayer.play();
-                playButton.innerHTML = "Pause";
             }
         });
 
-        // Handle play/pause button click
         playButton.addEventListener('click', function() {
             if (videoPlayer.paused()) {
                 videoPlayer.play();
-                playButton.innerHTML = "Pause";
             } else {
                 videoPlayer.pause();
-                playButton.innerHTML = "Play";
             }
         });
 
-        // Handle stop button click
         stopButton.addEventListener('click', function() {
             videoPlayer.pause();
             videoPlayer.currentTime(0);
-            playButton.innerHTML = "Play";
+            resetPauseTimer();
         });
 
-        // Sync custom play/pause button with video player button
         videoPlayer.on('play', function() {
             playButton.innerHTML = "Pause";
+            resetPauseTimer();
         });
 
         videoPlayer.on('pause', function() {
             playButton.innerHTML = "Play";
+            pauseStartTime = new Date();
+            if (!pauseTimerInterval) {
+                pauseTimerInterval = setInterval(updatePauseTimer, 1000);
+            }
         });
 
-        // Error handling
         videoPlayer.on('error', function(event) {
-            console.log('An error occurred while playing the video.');
-            console.log(event);
-            logError(event.error);
-            playButton.innerHTML = "Play";
+            console.log('An error occurred while playing the video:', event);
+            resetPauseTimer();
         });
-
-        function logError(error) {
-            var errorMessage = '';
-            if (error.code) {
-                errorMessage += 'Error code: ' + error.code + '<br>';
-            }
-            if (error.message) {
-                errorMessage += 'Error message: ' + error.message + '<br>';
-            }
-            log.innerHTML = errorMessage;
-        }
     </script>
 </body>
 </html>
