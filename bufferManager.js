@@ -3,7 +3,7 @@ class BufferManager {
   constructor(videoPlayer) {
     this.videoPlayer = videoPlayer;
     this.buffer = [];
-    this.maxBufferLength = 120000; // 2 minutes in milliseconds
+    this.maxBufferLength = 1800000; // 30 minutes in milliseconds
     this.initEvents();
   }
 
