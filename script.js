@@ -1,90 +1,71 @@
 document.addEventListener('DOMContentLoaded', function() {
-  var videoPlayer = videojs('videoPlayer');
+  var videoPlayer = document.getElementById('videoPlayer');
   var playButton = document.getElementById('playButton');
   var stopButton = document.getElementById('stopButton');
   var streamUrlInput = document.getElementById('streamUrl');
-  var pauseTimerValue = document.getElementById('pauseTimerValue');
-  var pauseTimerInterval;
-  var pauseStartTime;
+  var lastPauseTime = 0;
 
-  function resetPauseTimer() {
-    clearInterval(pauseTimerInterval);
-    pauseTimerValue.textContent = "00:00:00";
-    pauseTimerInterval = null;
+  var hls = new Hls();
+
+  // Check if HLS is supported
+  if (Hls.isSupported()) {
+    hls.attachMedia(videoPlayer);
+    hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+      console.log('Video and HLS.js are now bound together!');
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        console.log('Manifest parsed and loaded');
+      });
+    });
+  } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+    // HLS is natively supported in Safari
+    videoPlayer.addEventListener('canplay', function() {
+      videoPlayer.play();
+    });
   }
 
-  function updatePauseTimer() {
-    var elapsed = Date.now() - pauseStartTime;
-    var date = new Date(elapsed);
-    var hours = date.getUTCHours().toString().padStart(2, '0');
-    var minutes = date.getUTCMinutes().toString().padStart(2, '0');
-    var seconds = date.getUTCSeconds().toString().padStart(2, '0');
-    pauseTimerValue.textContent = `${hours}:${minutes}:${seconds}`;
-  }
+  streamUrlInput.addEventListener('change', function() {
+    var url = streamUrlInput.value;
+    if (Hls.isSupported()) {
+      hls.loadSource(url);
+      hls.on(Hls.Events.LEVEL_LOADED, function () {
+        console.log('Level loaded');
+      });
+    } else {
+      videoPlayer.src = url; // Directly load into video element for natively supported browsers
+    }
+    stopButton.disabled = false;
+  });
 
-  // Setup event listeners
-  playButton.addEventListener('click', function() {
-    if (videoPlayer.paused()) {
+  videoPlayer.onpause = function() {
+    lastPauseTime = Date.now();
+  };
+
+  videoPlayer.onplay = function() {
+    if (lastPauseTime) {
+      var currentTime = Date.now();
+      var timeDiff = currentTime - lastPauseTime;
+
+      if (timeDiff > 120000) { // More than 2 minutes
+        console.log('Jumping to live as the pause was longer than 2 minutes.');
+        if (hls.liveSyncPosition) {
+          videoPlayer.currentTime = hls.liveSyncPosition; // Set to the live sync position for HLS streams
+        }
+      }
+    }
+  };
+
+  playButton.onclick = function() {
+    if (videoPlayer.paused) {
       videoPlayer.play();
     } else {
       videoPlayer.pause();
     }
-  });
+  };
 
-  stopButton.addEventListener('click', function() {
+  stopButton.onclick = function() {
     videoPlayer.pause();
-    videoPlayer.currentTime(0);
+    videoPlayer.currentTime = 0;
     playButton.textContent = 'Play';
     stopButton.disabled = true;
-    resetPauseTimer();
-  });
-
-  streamUrlInput.addEventListener('input', function() {
-    // Enable the stop button when a stream URL is entered
-    stopButton.disabled = !streamUrlInput.value;
-  });
-
-  streamUrlInput.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter' && streamUrlInput.value) {
-      var url = streamUrlInput.value;
-      var type = videoPlayer.canPlayType('application/vnd.apple.mpegurl')
-? 'application/x-mpegURL' : 'application/dash+xml';
-videoPlayer.src({ src: url, type: type });
-videoPlayer.play();
-stopButton.disabled = false;
-}
-});
-
-document.getElementById('videoFile').addEventListener('change', function(event) {
-var file = event.target.files[0];
-var url = URL.createObjectURL(file);
-videoPlayer.src({ src: url, type: 'video/mp4' });
-videoPlayer.play();
-stopButton.disabled = false;
-});
-
-// Player event handlers
-videoPlayer.on('play', function() {
-playButton.textContent = 'Pause';
-resetPauseTimer();
-});
-
-videoPlayer.on('pause', function() {
-playButton.textContent = 'Play';
-if (!videoPlayer.seeking()) {
-pauseStartTime = Date.now();
-pauseTimerInterval = setInterval(updatePauseTimer, 1000);
-}
-});
-
-videoPlayer.on('ended', function() {
-playButton.textContent = 'Play';
-stopButton.disabled = true;
-resetPauseTimer();
-});
-
-videoPlayer.on('error', function(event) {
-console.error('An error occurred while playing the video:', event);
-resetPauseTimer();
-});
+  };
 });

@@ -1,0 +1,12 @@
+Read Me 
+HLS Stream link for testing
+https://live-par-2-cdn-alt.livepush.io/live/bigbuckbunnyclip/index.mpd
+
+
+------------------
+
+Added Feature in which our player is enhanced for following
+- In case of HLS Live Stream, 
+  -- I can pause the live stream for given time ( example 02 min, which is configurable)
+  -- if the time gap between pause and play is more than the configured time than your play move to the current live position of live    
+     stream otherwise it will play from the pause location only

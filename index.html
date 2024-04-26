@@ -22,9 +22,20 @@
         <span id="pauseTimerValue">00:00:00</span>
     </div>
 
+<div id="liveIndicator" style="visibility: hidden; position: absolute; top: 20px; right: 20px; padding: 10px; background-color: red; color: white;">
+  Jumping to Live Stream...
+</div>
+
+<div id="bufferIndicator" style="display: none; position: absolute; top: 20px; right: 20px; background-color: red; color: white; padding: 5px;">
+  Jumping to 2-min buffer...
+</div>
+
+
     <script src="https://vjs.zencdn.net/7.14.3/video.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls@3.6.5/dist/videojs-contrib-hls.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-dash@5.0.2/dist/videojs-dash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="script.js"></script>
+    <script src="bufferManager.js"></script>
 </body>
 </html>
