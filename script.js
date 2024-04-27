@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
       var currentTime = Date.now();
       var timeDiff = currentTime - lastPauseTime;
 
-      if (timeDiff > 1800000) { // More than 30 minutes
+      if (timeDiff > 120000) { // More than 2 minutes
         console.log('Jumping to live as the pause was longer than 2 minutes.');
         if (hls.liveSyncPosition) {
           videoPlayer.currentTime = hls.liveSyncPosition; // Set to the live sync position for HLS streams
