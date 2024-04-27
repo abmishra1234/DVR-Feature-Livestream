@@ -3,37 +3,49 @@ document.addEventListener('DOMContentLoaded', function() {
   var playButton = document.getElementById('playButton');
   var stopButton = document.getElementById('stopButton');
   var streamUrlInput = document.getElementById('streamUrl');
+  var videoFileInput = document.getElementById('videoFile');
   var lastPauseTime = 0;
+  var isLiveStream = false; // Flag to check if the current source is a live stream
 
   var hls = new Hls();
 
-  // Check if HLS is supported
-  if (Hls.isSupported()) {
-    hls.attachMedia(videoPlayer);
-    hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-      console.log('Video and HLS.js are now bound together!');
-      hls.on(Hls.Events.MANIFEST_PARSED, function () {
-        console.log('Manifest parsed and loaded');
+  // Function to initialize HLS or native HLS
+  function setupLiveStream(url) {
+    if (Hls.isSupported()) {
+      hls.attachMedia(videoPlayer);
+      hls.on(Hls.Events.MEDIA_ATTACHED, function() {
+        console.log('Video and HLS.js are now bound together!');
+        hls.loadSource(url);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          console.log('Manifest parsed and loaded');
+          videoPlayer.play();
+        });
       });
-    });
-  } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-    // HLS is natively supported in Safari
-    videoPlayer.addEventListener('canplay', function() {
-      videoPlayer.play();
-    });
+    } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+      videoPlayer.src = url;
+      videoPlayer.addEventListener('canplay', function() {
+        videoPlayer.play();
+      });
+    }
+    isLiveStream = true;
+    stopButton.disabled = false;
   }
 
+  // Live stream URL input change event
   streamUrlInput.addEventListener('change', function() {
-    var url = streamUrlInput.value;
-    if (Hls.isSupported()) {
-      hls.loadSource(url);
-      hls.on(Hls.Events.LEVEL_LOADED, function () {
-        console.log('Level loaded');
-      });
-    } else {
-      videoPlayer.src = url; // Directly load into video element for natively supported browsers
+    setupLiveStream(streamUrlInput.value);
+  });
+
+  // File input change event for MP4 files
+  videoFileInput.addEventListener('change', function(event) {
+    var file = event.target.files[0];
+    if (file) {
+      var url = URL.createObjectURL(file);
+      videoPlayer.src = url;
+      videoPlayer.play();
+      isLiveStream = false; // It's an MP4 file, not a live stream
+      stopButton.disabled = false;
     }
-    stopButton.disabled = false;
   });
 
   videoPlayer.onpause = function() {
@@ -41,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   videoPlayer.onplay = function() {
-    if (lastPauseTime) {
+    if (isLiveStream && lastPauseTime) { // Apply this logic only for live streams
       var currentTime = Date.now();
       var timeDiff = currentTime - lastPauseTime;
 
