@@ -31,9 +31,11 @@ document.addEventListener('DOMContentLoaded', function() {
     stopButton.disabled = false;
   }
 
-  // Live stream URL input change event
-  streamUrlInput.addEventListener('change', function() {
-    setupLiveStream(streamUrlInput.value);
+  // Live stream URL input change event - replaced with keyup to handle Enter key
+  streamUrlInput.addEventListener('keyup', function(event) {
+    if (event.key === "Enter") {  // Checks if the key pressed is 'Enter'
+      setupLiveStream(streamUrlInput.value);
+    }
   });
 
   // File input change event for MP4 files
@@ -60,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (timeDiff > 120000) { // More than 2 minutes
         console.log('Jumping to live as the pause was longer than 2 minutes.');
         if (hls.liveSyncPosition) {
-          videoPlayer.currentTime = hls.liveSyncPosition; // Set to the live sync position for HLS streams
+          videoPlayer.currentTime = hls.liveSyncPosition;
         }
       }
     }
