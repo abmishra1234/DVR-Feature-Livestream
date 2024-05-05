@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
       hls.attachMedia(videoPlayer);
       hls.on(Hls.Events.MEDIA_ATTACHED, function() {
         console.log('Video and HLS.js are now bound together!');
-        console.log("The value of url passed here ---> " + url);
         hls.loadSource(url);
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
           console.log('Manifest parsed and loaded');
@@ -50,44 +49,6 @@ document.addEventListener('DOMContentLoaded', function() {
       stopButton.disabled = false;
     }
   });
-
-
-  // New function to fetch stream URL from API
-  function fetchStreamUrlFromAPI() {
-    fetch('https://5k2487aafd.execute-api.ap-south-1.amazonaws.com/dev/stream-url')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();  // Convert the response to JSON
-        })
-        .then(data => {
-            try {
-                console.log("Initial API Response:", data);
-                // Since 'body' is a stringified JSON, parse it again to get the actual object
-                const bodyData = JSON.parse(data.body);
-                console.log("Parsed Body Data:", bodyData);
-                if (bodyData.hlsUrl && typeof bodyData.hlsUrl === 'string') {
-                    let hlsUrl = bodyData.hlsUrl;
-                    if (hlsUrl.endsWith('/')) {
-                        hlsUrl = hlsUrl.slice(0, -1);
-                    }
-                    setupLiveStream(hlsUrl);
-                } else {
-                    console.error('hlsUrl not found in the body or is not a string');
-                }
-            } catch (error) {
-                console.error('Error parsing JSON from body:', error);
-            }
-        })
-        .catch(error => console.error('Error fetching HLS URL:', error));
-}
-
-  // Event listener for the new button
-  newStreamButton.addEventListener('click', function() {
-    fetchStreamUrlFromAPI();
-  });
-
 
   videoPlayer.onpause = function() {
     lastPauseTime = Date.now();
