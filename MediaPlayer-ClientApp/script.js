@@ -5,7 +5,11 @@ document.addEventListener('DOMContentLoaded', function() {
   var streamUrlInput = document.getElementById('streamUrl');
   var videoFileInput = document.getElementById('videoFile');
   var lastPauseTime = 0;
-  var isLiveStream = false; // Flag to check if the current source is a live stream
+  // Flag to check if the current source is a live stream
+  var isLiveStream = false; 
+  
+  // For testing purpose it is made like 02 minute, but later we will define this as 30 min
+  var timeThreshold = 120000; 
 
   var hls = new Hls();
 
@@ -90,17 +94,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
   videoPlayer.onpause = function() {
+    console.log(`Pause of playback is initiating`);
     lastPauseTime = Date.now();
   };
 
   videoPlayer.onplay = function() {
+    console.log(`Playback started and isLiveStream = ${isLiveStream}`);
     if (isLiveStream && lastPauseTime) { // Apply this logic only for live streams
+      console.log('Playback of live stream started!!!');
       var currentTime = Date.now();
       var timeDiff = currentTime - lastPauseTime;
+      console.log(`The time gap between pause and play was ${timeDiff/1000} seconds`);
 
-      if (timeDiff > 120000) { // More than 2 minutes
-        console.log('Jumping to live as the pause was longer than 2 minutes.');
+      if (timeDiff > timeThreshold) { // More than time threshold value
         if (hls.liveSyncPosition) {
+          console.log('Jumping to live location of stream!!!');  
           videoPlayer.currentTime = hls.liveSyncPosition;
         }
       }
@@ -109,13 +117,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   playButton.onclick = function() {
     if (videoPlayer.paused) {
+      console.log('Playback started!!!');
       videoPlayer.play();
     } else {
+      console.log('Pausing of playback!!!');
       videoPlayer.pause();
     }
   };
 
   stopButton.onclick = function() {
+    console.log('stopButton.onclick is called!!!')
     videoPlayer.pause();
     videoPlayer.currentTime = 0;
     playButton.textContent = 'Play';
