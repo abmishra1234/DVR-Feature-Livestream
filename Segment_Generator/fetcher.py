@@ -14,4 +14,3 @@ class HLSFetcher:
         except requests.RequestException as e:
             logging.error(f"Error fetching HLS livestream: {e}")
             raise
-

@@ -1,6 +1,8 @@
 import logging
+import os
 from fetcher import HLSFetcher
 from generator import SegmentGenerator
+from logger import setup_logger
 
 class MainService:
     def __init__(self, hls_url, output_path, bitrates):
@@ -21,9 +23,11 @@ class MainService:
             logging.error(f"An error occurred in the main service: {e}")
 
 if __name__ == "__main__":
-    hls_url = "https://example.com/live/stream.m3u8"  # Replace with actual URL
-    output_path = "/path/to/output"  # Replace with actual output path
-    bitrates = ["500k", "1000k", "1500k"]  # Example bitrates
+    # Replace with actual values
+    hls_url = "https://d3kpx1cp1t9frc.cloudfront.net/index.m3u8"
+    output_path = os.path.join(os.getcwd(), "output")
+    bitrates = ["500k", "1000k", "1500k"]
 
+    setup_logger()
     service = MainService(hls_url, output_path, bitrates)
     service.run()
