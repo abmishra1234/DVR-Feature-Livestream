@@ -16,7 +16,7 @@ def setup_logger():
                   '%(name)s - %(levelname)s - %(message)s')
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format=log_format,
         datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
