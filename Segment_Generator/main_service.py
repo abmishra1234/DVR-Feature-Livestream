@@ -20,9 +20,7 @@ class MainService:
             resolution, bitrate = fetcher.parse_m3u8()
 
             if resolution and bitrate:
-                logging.info(f"Fetched final URL: {final_url}, Resolution: {resolution}, Bitrate: {bitrate} kbps")
-                logging.debug(f"Creating SegmentGenerator with final_url: {final_url}, output_path: {self.output_path}, resolution: {resolution}, bitrate: {bitrate}")
-                generator = SegmentGenerator(final_url, self.output_path, resolution, bitrate)
+                generator = SegmentGenerator(final_url, self.output_path)
                 logging.debug("Calling generate_segments method on SegmentGenerator.")
                 generator.generate_segments()
                 logging.info("Segment generation process completed successfully.")
@@ -36,8 +34,8 @@ if __name__ == "__main__":
     hls_url = "https://d19y7l1gyy74p9.cloudfront.net/playlist.m3u8"
     output_path = os.path.join(os.getcwd(), "output")
 
-    setup_logger()
-    logging.info("Starting the MainService application.")
+    #setup_logger()
+    logging.info("###############Starting the MainService application.###############\n\n")
     service = MainService(hls_url, output_path)
     service.run()
-    logging.info("MainService application finished.")
+    logging.info("\n\n###################MainService application finished.###################")
