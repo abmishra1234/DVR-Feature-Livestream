@@ -34,8 +34,8 @@ if __name__ == "__main__":
     hls_url = "https://d19y7l1gyy74p9.cloudfront.net/playlist.m3u8"
     output_path = os.path.join(os.getcwd(), "output")
 
-    #setup_logger()
+    setup_logger()
     logging.info("###############Starting the MainService application.###############\n\n")
     service = MainService(hls_url, output_path)
     service.run()
-    logging.info("\n\n###################MainService application finished.###################")
+    logging.info("\n\n###################MainService application finished.#################")

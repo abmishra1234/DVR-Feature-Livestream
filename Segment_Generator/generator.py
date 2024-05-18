@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import time
 import concurrent.futures
 
@@ -15,20 +15,21 @@ class SegmentGenerator:
         self.segments_downloaded = set()
         self.subtitles_downloaded = set()
 
+        # Extract domain name from URL to use as the root directory name
+        self.domain_name = urlparse(input_url).netloc
+        self.root_dir = os.path.join(self.output_path, self.domain_name)
+        os.makedirs(self.root_dir, exist_ok=True)
+
     def generate_segments(self):
         logging.info("Starting the generation of segments.")
-        timestamp = datetime.now().strftime('%H%M%S')
-        base_filename = f"playlist_{timestamp}"
-        output_dir = os.path.join(self.output_path, base_filename)
-        logging.debug(f"Creating output directory: {output_dir}")
-        os.makedirs(output_dir, exist_ok=True)
-
         with concurrent.futures.ThreadPoolExecutor() as executor:
             while True:
                 try:
                     # Download and process master playlist
                     master_playlist_content = self._download_file(self.input_url)
-                    futures = self._process_master_playlist(master_playlist_content, output_dir, executor)
+                    master_playlist_path = os.path.join(self.root_dir, "playlist.m3u8")
+                    self._save_content_to_file(master_playlist_content, master_playlist_path)
+                    futures = self._process_master_playlist(master_playlist_content, self.root_dir, executor)
 
                     # Wait for all futures to complete
                     concurrent.futures.wait(futures)
@@ -46,6 +47,16 @@ class SegmentGenerator:
             return response.text
         except requests.RequestException as e:
             logging.error(f"Error downloading file from URL: {url} - {e}", exc_info=True)
+            raise
+
+    def _save_content_to_file(self, content, file_path):
+        logging.debug(f"Saving content to file: {file_path}")
+        try:
+            with open(file_path, 'w') as f:
+                f.write(content)
+            logging.info(f"Successfully saved content to {file_path}")
+        except IOError as e:
+            logging.error(f"Error saving content to file: {file_path} - {e}", exc_info=True)
             raise
 
     def _process_master_playlist(self, content, output_dir, executor):
@@ -67,10 +78,11 @@ class SegmentGenerator:
                             futures.append(future)
                 elif line.startswith("#EXT-X-MEDIA") and "TYPE=SUBTITLES" in line:
                     subtitle_url = self._extract_attribute(line, "URI")
-                    if subtitle_url:
+                    language = self._extract_attribute(line, "LANGUAGE")
+                    if subtitle_url and language:
                         full_subtitle_url = urljoin(self.input_url, subtitle_url)
-                        logging.debug(f"Found subtitle URL: {full_subtitle_url}")
-                        future = executor.submit(self._download_subtitle_playlist, full_subtitle_url, output_dir)
+                        logging.debug(f"Found subtitle URL: {full_subtitle_url} for language: {language}")
+                        future = executor.submit(self._download_subtitle_playlist, full_subtitle_url, output_dir, language)
                         futures.append(future)
             except Exception as e:
                 logging.error(f"Error processing master playlist line: {line} - {e}", exc_info=True)
@@ -93,9 +105,8 @@ class SegmentGenerator:
             segment_dir = os.path.join(output_dir, f"{resolution}_{bandwidth}")
             os.makedirs(segment_dir, exist_ok=True)
             
-            playlist_filename = os.path.join(segment_dir, "playlist.m3u8")
-            with open(playlist_filename, 'w') as f:
-                f.write(playlist_content)
+            playlist_filename = os.path.join(segment_dir, f"playlist_{resolution}.m3u8")
+            self._save_content_to_file(playlist_content, playlist_filename)
             
             with concurrent.futures.ThreadPoolExecutor() as segment_executor:
                 futures = []
@@ -111,18 +122,17 @@ class SegmentGenerator:
         except Exception as e:
             logging.error(f"Error downloading playlist and segments from URL: {playlist_url} - {e}", exc_info=True)
 
-    def _download_subtitle_playlist(self, subtitle_url, output_dir):
+    def _download_subtitle_playlist(self, subtitle_url, output_dir, language):
         try:
             logging.debug(f"Downloading subtitle playlist from URL: {subtitle_url}")
             subtitle_content = self._download_file(subtitle_url)
             subtitle_lines = subtitle_content.splitlines()
 
-            subtitle_dir = os.path.join(output_dir, "subtitles")
+            subtitle_dir = os.path.join(output_dir, "subtitles", language)
             os.makedirs(subtitle_dir, exist_ok=True)
 
-            playlist_filename = os.path.join(subtitle_dir, "playlist.m3u8")
-            with open(playlist_filename, 'w') as f:
-                f.write(subtitle_content)
+            playlist_filename = os.path.join(subtitle_dir, "playlist_webvtt.m3u8")
+            self._save_content_to_file(subtitle_content, playlist_filename)
 
             with concurrent.futures.ThreadPoolExecutor() as subtitle_executor:
                 futures = []
