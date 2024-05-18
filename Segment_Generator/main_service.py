@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from fetcher import HLSFetcher
 from generator import SegmentGenerator
 from logger import setup_logger
@@ -30,9 +31,12 @@ class MainService:
             logging.error(f"An error occurred in the main service: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    # Replace with actual values
-    hls_url = "https://d19y7l1gyy74p9.cloudfront.net/playlist.m3u8"
-    output_path = os.path.join(os.getcwd(), "output")
+    # Load configuration
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
+
+    hls_url = config["hls_url"]
+    output_path = os.path.join(os.getcwd(), config["output_path"])
 
     setup_logger()
     logging.info("###############Starting the MainService application.###############\n\n")

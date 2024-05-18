@@ -5,9 +5,14 @@ import requests
 from urllib.parse import urljoin, urlparse
 import time
 import concurrent.futures
+import json
+
+# Load configuration
+with open('config.json', 'r') as config_file:
+    config = json.load(config_file)
 
 class SegmentGenerator:
-    def __init__(self, input_url, output_path, poll_interval=10):
+    def __init__(self, input_url, output_path, poll_interval=config["poll_interval"]):
         logging.debug(f"Initializing SegmentGenerator with input_url={input_url}, output_path={output_path}, poll_interval={poll_interval}")
         self.input_url = input_url
         self.output_path = output_path
