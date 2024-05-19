@@ -11,14 +11,21 @@ import json
 with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
+from s3_uploader import S3Uploader
+
 class SegmentGenerator:
-    def __init__(self, input_url, output_path, poll_interval=config["poll_interval"]):
-        logging.debug(f"Initializing SegmentGenerator with input_url={input_url}, output_path={output_path}, poll_interval={poll_interval}")
+    def __init__(self, input_url, output_path, s3_bucket_name=None):
+        logging.debug(f"Initializing SegmentGenerator with input_url={input_url}, output_path={output_path}, s3_bucket_name={s3_bucket_name}")
         self.input_url = input_url
         self.output_path = output_path
-        self.poll_interval = poll_interval
+        self.poll_interval = int(config.get("poll_interval"))  # Ensure poll_interval is an integer
         self.segments_downloaded = set()
         self.subtitles_downloaded = set()
+
+        self.s3_bucket_name = s3_bucket_name
+        if self.s3_bucket_name:
+            self.s3_uploader = S3Uploader(bucket_name=self.s3_bucket_name,
+                                          region_name=config.get("region_name"))
 
         # Extract domain name from URL to use as the root directory name
         self.domain_name = urlparse(input_url).netloc
@@ -35,6 +42,10 @@ class SegmentGenerator:
                     master_playlist_path = os.path.join(self.root_dir, "playlist.m3u8")
                     self._save_content_to_file(master_playlist_content, master_playlist_path)
                     futures = self._process_master_playlist(master_playlist_content, self.root_dir, executor)
+
+                    # Upload master playlist to S3 if S3 bucket is configured
+                    if self.s3_bucket_name:
+                        self._upload_file_to_s3(master_playlist_path, self.domain_name)
 
                     # Wait for all futures to complete
                     concurrent.futures.wait(futures)
@@ -63,6 +74,17 @@ class SegmentGenerator:
         except IOError as e:
             logging.error(f"Error saving content to file: {file_path} - {e}", exc_info=True)
             raise
+
+    def _upload_file_to_s3(self, file_path, s3_prefix):
+        if self.s3_bucket_name:
+            relative_path = os.path.relpath(file_path, self.root_dir)
+            s3_path = os.path.join(s3_prefix, relative_path).replace("\\", "/")
+            try:
+                logging.debug(f"Uploading {file_path} to s3://{self.s3_bucket_name}/{s3_path}")
+                self.s3_uploader.upload_file(file_path, self.s3_bucket_name, s3_path)
+            except Exception as e:
+                logging.error(f"Error uploading {file_path} to S3: {e}", exc_info=True)
+                raise
 
     def _process_master_playlist(self, content, output_dir, executor):
         logging.debug("Processing master playlist.")
@@ -112,6 +134,7 @@ class SegmentGenerator:
             
             playlist_filename = os.path.join(segment_dir, f"playlist_{resolution}.m3u8")
             self._save_content_to_file(playlist_content, playlist_filename)
+            self._upload_file_to_s3(playlist_filename, self.domain_name)
             
             with concurrent.futures.ThreadPoolExecutor() as segment_executor:
                 futures = []
@@ -138,6 +161,7 @@ class SegmentGenerator:
 
             playlist_filename = os.path.join(subtitle_dir, "playlist_webvtt.m3u8")
             self._save_content_to_file(subtitle_content, playlist_filename)
+            self._upload_file_to_s3(playlist_filename, self.domain_name)
 
             with concurrent.futures.ThreadPoolExecutor() as subtitle_executor:
                 futures = []
@@ -163,6 +187,8 @@ class SegmentGenerator:
                     if chunk:
                         f.write(chunk)
             logging.info(f"Successfully downloaded segment to {file_path}")
+            # Upload the file to S3 immediately after downloading
+            self._upload_file_to_s3(file_path, self.domain_name)
         except requests.RequestException as e:
             logging.error(f"Error downloading segment from URL: {url} - {e}", exc_info=True)
             raise
