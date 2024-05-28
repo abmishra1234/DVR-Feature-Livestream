@@ -19,10 +19,9 @@ class MainService:
             logging.debug("Calling fetch method on HLSFetcher.")
             final_url = fetcher.fetch()
             resolution, bitrate = fetcher.parse_m3u8()
-            bucket_name = s3_bucket_name=config.get("s3_bucket_name")
 
             if resolution and bitrate:
-                generator = SegmentGenerator(final_url, self.output_path, bucket_name)
+                generator = SegmentGenerator(final_url, self.output_path)
                 logging.debug("Calling generate_segments method on SegmentGenerator.")
                 generator.generate_segments()
                 logging.info("Segment generation process completed successfully.")

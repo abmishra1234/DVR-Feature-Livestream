@@ -1,7 +1,5 @@
 {
     "hls_url": "https://d19y7l1gyy74p9.cloudfront.net/playlist.m3u8",
-    "output_path": "./output",
-    "poll_interval": 10,
-    "region_name": "ap-south-1",
-    "s3_bucket_name": "poc.hls.streams"    
+    "output_path": "output",
+    "poll_interval": 10
 }
