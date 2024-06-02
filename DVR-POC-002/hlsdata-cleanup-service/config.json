@@ -1,0 +1,5 @@
+{
+    "directory": "../hls-download/hls_data",
+    "retention_period": 5,
+    "polling_interval": 60
+}

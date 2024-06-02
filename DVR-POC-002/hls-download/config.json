@@ -1,0 +1,10 @@
+{
+    "hls_url": "https://d19y7l1gyy74p9.cloudfront.net/playlist.m3u8",
+    "download_directory": "./hls_data",
+    "thread_count": 10,
+    "segment_timeout": 10,
+    "log_file": "hls_downloader",
+    "download_duration_minutes": -1,
+    "sleep_interval_seconds": 2
+}
+  
