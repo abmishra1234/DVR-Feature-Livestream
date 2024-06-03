@@ -129,22 +129,22 @@ def main():
     output_dir = 'output'
     converter = MediaConverter(input_file, output_dir)
 
-    bucket_name = 'poc.hls.streams'
+    bucket_name = 'hls-stream-bucket-002'
     # Replace with your actual ID or None if you want to create a new distribution
-    distribution_id = 'E3307LF0PMAAC5'
+    #distribution_id = 'E3307LF0PMAAC5'
 
     uploader = S3Uploader(bucket_name, output_dir)
-    cf_manager = CloudFrontManager(bucket_name, distribution_id)
+    #cf_manager = CloudFrontManager(bucket_name, distribution_id)
 
     converter.convert_to_hls()
     uploader.upload_files()
 
     # This will check for existing ID or create a new one
-    cf_manager.create_distribution()
+    #cf_manager.create_distribution()
     
     # Invalidate cache after ensuring distribution is set up
-    cf_manager.invalidate_cache()
-    print("Using CloudFront Distribution:", distribution_id)
+    #cf_manager.invalidate_cache()
+    #print("Using CloudFront Distribution:", distribution_id)
 
 if __name__ == "__main__":
     main()
