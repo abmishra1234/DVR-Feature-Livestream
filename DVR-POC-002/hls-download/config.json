@@ -5,6 +5,8 @@
     "segment_timeout": 10,
     "log_file": "hls_downloader",
     "download_duration_minutes": -1,
-    "sleep_interval_seconds": 2
+    "sleep_interval_seconds": 2,
+    "master_manifest_name": "playlist.m3u8",
+    "subtitle_manifest_name": "playlist_webvtt.m3u8"
 }
   

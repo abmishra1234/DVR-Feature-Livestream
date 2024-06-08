@@ -41,7 +41,7 @@ def download_file(url, save_path, timeout):
     except OSError as e:
         logging.error(f"OS error when saving file {save_path}: {e}")
 
-def parse_master_manifest(url, download_dir):
+def parse_master_manifest(url, download_dir, master_manifest_name):
     response = requests.get(url)
     response.raise_for_status()
     manifest_content = response.text
@@ -49,7 +49,7 @@ def parse_master_manifest(url, download_dir):
     subtitles = []
     closed_captions = []
 
-    master_manifest_path = download_dir / 'master.m3u8'
+    master_manifest_path = download_dir / master_manifest_name #######'playlist.m3u8'
     with open(master_manifest_path, 'w') as file:
         file.write(manifest_content)
     logging.info(f"Downloaded master manifest: {master_manifest_path}")
