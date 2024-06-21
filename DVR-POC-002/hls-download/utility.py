@@ -2,10 +2,9 @@ import os
 import json
 import logging
 import requests
-
 from pathlib import Path
 from urllib.parse import urljoin
-from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 
 def load_config(config_path='config.json'):
     with open(config_path) as config_file:
@@ -13,17 +12,14 @@ def load_config(config_path='config.json'):
     return config
 
 def setup_logging(logFile):
-    # Define the logs directory
     log_directory = "logs"
     os.makedirs(log_directory, exist_ok=True)
-
-    # Create a timestamped log file
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    log_file = os.path.join(log_directory, f"{logFile}_{date_str}.log")
-
-    # Set up logging configuration
+    log_file = os.path.join(log_directory, logFile)
     log_format = '%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
-    logging.basicConfig(filename=log_file, level=logging.DEBUG, format=log_format)
+    handler = TimedRotatingFileHandler(log_file, when="midnight", interval=1)
+    handler.suffix = "%Y-%m-%d.log"
+    handler.extMatch = r"^\d{4}-\d{2}-\d{2}.log$"
+    logging.basicConfig(level=logging.DEBUG, format=log_format, handlers=[handler])
     logging.info("Configuration loaded and directories set up.")
 
 def download_file(url, save_path, timeout):
@@ -49,7 +45,7 @@ def parse_master_manifest(url, download_dir, master_manifest_name):
     subtitles = []
     closed_captions = []
 
-    master_manifest_path = download_dir / master_manifest_name #######'playlist.m3u8'
+    master_manifest_path = download_dir / master_manifest_name
     with open(master_manifest_path, 'w') as file:
         file.write(manifest_content)
     logging.info(f"Downloaded master manifest: {master_manifest_path}")
@@ -96,5 +92,3 @@ def update_target_duration(manifest_path, max_duration):
     
     with open(manifest_path, 'w') as file:
         file.writelines(updated_lines)
-
-

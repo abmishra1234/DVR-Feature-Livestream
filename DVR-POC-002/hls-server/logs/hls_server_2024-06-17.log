@@ -1,0 +1,17 @@
+2024-06-17 08:00:20,347:ERROR:main.py:100:Error fetching master playlist: name 'aiofiles' is not defined
+2024-06-17 08:02:01,731:INFO:main.py:64:Execution time for get_master_playlist: 0.014079 seconds
+2024-06-17 08:02:22,080:INFO:main.py:64:Execution time for get_resolution_playlist: 0.001001 seconds
+2024-06-17 08:03:06,913:INFO:main.py:64:Execution time for get_ts_file: 0.01795 seconds
+2024-06-17 08:03:29,336:INFO:main.py:64:Execution time for get_subtitle_playlist: 0.001999 seconds
+2024-06-17 08:03:55,916:INFO:main.py:64:Execution time for get_vtt_file: 0.015432 seconds
+2024-06-17 08:04:22,131:INFO:main.py:64:Execution time for get_vtt_file: 0.00208 seconds
+2024-06-17 08:04:43,864:INFO:main.py:64:Execution time for get_vtt_file: 0.002039 seconds
+2024-06-17 08:11:05,473:INFO:main.py:64:Execution time for get_vtt_file: 0.001002 seconds
+2024-06-17 08:11:11,528:INFO:main.py:64:Execution time for get_master_playlist: 0.006884 seconds
+2024-06-17 08:11:15,523:INFO:main.py:64:Execution time for get_ts_file: 0.011138 seconds
+2024-06-17 08:11:21,018:INFO:main.py:64:Execution time for get_subtitle_playlist: 0.004088 seconds
+2024-06-17 08:11:24,462:INFO:main.py:64:Execution time for get_vtt_file: 0.001029 seconds
+2024-06-17 08:12:26,101:INFO:main.py:64:Execution time for get_ts_file: 0.003 seconds
+2024-06-17 08:12:53,684:INFO:main.py:64:Execution time for get_ts_file: 0.001534 seconds
+2024-06-17 08:12:55,552:INFO:main.py:64:Execution time for get_ts_file: 0.003015 seconds
+2024-06-17 08:12:56,888:INFO:main.py:64:Execution time for get_ts_file: 0.003745 seconds

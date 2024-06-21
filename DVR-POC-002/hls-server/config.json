@@ -1,0 +1,6 @@
+{
+    "segments_dir": "../hls-download/hls_data",
+    "subtitle_dir_eng": "../hls-download/hls_data/eng",
+    "enable_time_logging": false
+}
+  
