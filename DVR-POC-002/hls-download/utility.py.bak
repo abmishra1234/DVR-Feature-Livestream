@@ -6,8 +6,6 @@ import requests
 from pathlib import Path
 from urllib.parse import urljoin
 from logging.handlers import TimedRotatingFileHandler
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 
 def load_config(config_path='config.json'):
     try:
@@ -32,57 +30,20 @@ def setup_logging(log_file):
     logging.basicConfig(level=logging.DEBUG, format=log_format, handlers=[handler])
     logging.info("Configuration loaded and directories set up.")
 
-def get_s3_client(s3_config):
-    try:
-        s3_client = boto3.client(
-            's3',
-            region_name=s3_config['region_name']
-        )
-        return s3_client
-    except (BotoCoreError, ClientError) as e:
-        logging.error(f"Failed to create S3 client: {e}")
-        raise
-
-def download_file(url, save_path, timeout, storage_type, s3_config=None):
+def download_file(url, save_path, timeout):
     try:
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
-        content = response.content
-
-        if storage_type == 'local':
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, 'wb') as file:
-                file.write(content)
-            logging.info(f"Downloaded file: {save_path}")
-
-        elif storage_type == 's3' and s3_config:
-            s3_client = get_s3_client(s3_config)
-
-            # Extract the directory and filename
-            directory = save_path.parent.name
-            filename = save_path.name
-
-            # Construct the S3 key
-            s3_key = f"{directory}/{filename}"
-
-            s3_client.put_object(Bucket=s3_config['bucket_name'], Key=s3_key, Body=content)
-            logging.info(f"Uploaded file to S3: {s3_key}")
-
-        else:
-            logging.error("Invalid storage type or missing S3 configuration")
-            raise ValueError("Invalid storage type or missing S3 configuration")
-        
-        # TBD, abinash.km : Add your Fast API call at this place, so that it will work well
-
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(save_path, 'wb') as file:
+            file.write(response.content)
+        logging.info(f"Downloaded file: {save_path}")
     except requests.Timeout:
         logging.error(f"Timeout occurred while downloading {url}")
     except requests.RequestException as e:
         logging.error(f"Failed to download {url}: {e}")
-    except (BotoCoreError, ClientError) as e:
-        logging.error(f"Failed to upload to S3: {e}")
     except OSError as e:
         logging.error(f"OS error when saving file {save_path}: {e}")
-
 
 def parse_master_manifest(url, download_dir, master_manifest_name):
     try:
@@ -95,7 +56,6 @@ def parse_master_manifest(url, download_dir, master_manifest_name):
 
     master_manifest_path = download_dir / master_manifest_name
     master_manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    # alt+ctrl+k
     with open(master_manifest_path, 'w') as file:
         file.write(manifest_content)
     logging.info(f"Downloaded master manifest: {master_manifest_path}")
@@ -130,10 +90,9 @@ def parse_media_inf(line, base_url, media_type):
 
 def update_target_duration(manifest_path, max_duration):
     try:
-        # for moving to next bookmark use the 'alt+ctrl+j'
         with open(manifest_path, 'r') as file:
             lines = file.readlines()
-       
+        
         updated_lines = []
         target_duration_updated = False
         for line in lines:
@@ -142,10 +101,10 @@ def update_target_duration(manifest_path, max_duration):
                 target_duration_updated = True
             else:
                 updated_lines.append(line)
-       
+        
         if not target_duration_updated:
             updated_lines.insert(0, f"#EXT-X-TARGETDURATION:{int(max_duration) + 1}\n")
-       
+        
         with open(manifest_path, 'w') as file:
             file.writelines(updated_lines)
         logging.info(f"Updated target duration in manifest: {manifest_path}")

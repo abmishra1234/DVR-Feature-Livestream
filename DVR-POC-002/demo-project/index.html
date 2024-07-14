@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Stream</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <video id="video" controls></video>
+    <script>
+        var video = document.getElementById('video');
+        var hls = new Hls();
+        var currentPlaylistIndex = 0;
+        var isUserInteracted = false;
+        var preBufferTime = 60; // Pre-buffering time in seconds (customizable)
+        var bufferedDuration = 0;
+        var isBuffered = false;
+        var segmentStatus = new Map();
+        var lastPlayedSegment = -1;
+
+        function logMessage(message) {
+            console.log(`[LOG] ${message}`);
+        }
+
+        function loadPlaylist(index) {
+            var playlistUrl = `http://localhost:8000/playlist_640x360.m3u8`;
+            logMessage(`Loading playlist: ${playlistUrl}`);
+            hls.loadSource(playlistUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                logMessage("Manifest parsed, starting buffering...");
+                startBuffering();
+            });
+            hls.on(Hls.Events.FRAG_BUFFERED, function(event, data) {
+                bufferedDuration += data.frag.duration;
+                segmentStatus.set(data.frag.sn, 'buffered');
+                logMessage(`Buffered Duration: ${bufferedDuration}s, Segment: ${data.frag.sn} buffered`);
+                if (bufferedDuration >= preBufferTime && isUserInteracted && !isBuffered) {
+                    isBuffered = true;
+                    video.play();
+                }
+            });
+            hls.on(Hls.Events.FRAG_LOADING, function(event, data) {
+                if (segmentStatus.has(data.frag.sn) && segmentStatus.get(data.frag.sn) === 'buffered') {
+                    logMessage(`Skipping already buffered segment request: ${data.frag.sn}`);
+                    event.stopImmediatePropagation();
+                } else if (data.frag.sn !== lastPlayedSegment + 1) {
+                    logMessage(`Skipping out-of-order segment request: ${data.frag.sn}`);
+                    event.stopImmediatePropagation();
+                } else {
+                    segmentStatus.set(data.frag.sn, 'requested');
+                    logMessage(`Loading segment: ${data.frag.sn}`);
+                }
+            });
+            hls.on(Hls.Events.FRAG_CHANGED, function(event, data) {
+                lastPlayedSegment = data.frag.sn;
+                segmentStatus.set(data.frag.sn, 'played');
+                logMessage(`Segment played: ${data.frag.sn}`);
+            });
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR) {
+                    console.error("Failed to load manifest:", data.response);
+                } else {
+                    console.error("HLS Error:", data);
+                }
+            });
+        }
+
+        function startBuffering() {
+            video.play();
+            video.pause();
+            bufferedDuration = 0; // Reset buffered duration
+            logMessage("Buffering started...");
+        }
+
+        video.addEventListener('ended', function() {
+            currentPlaylistIndex++;
+            loadPlaylist(currentPlaylistIndex);
+        });
+
+        video.addEventListener('click', function() {
+            isUserInteracted = true;
+            if (bufferedDuration >= preBufferTime && !isBuffered) {
+                isBuffered = true;
+                video.play();
+            }
+        });
+
+        if (Hls.isSupported()) {
+            loadPlaylist(currentPlaylistIndex);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = `http://localhost:8000/playlist_640x360.m3u8`;
+            video.addEventListener('canplay', function() {
+                if (isUserInteracted) {
+                    video.play();
+                }
+            });
+        }
+
+        video.addEventListener('play', function() {
+            if (hls.media) {
+                hls.media.currentTime = bufferedDuration - preBufferTime;
+            }
+        });
+    </script>
+</body>
+</html>

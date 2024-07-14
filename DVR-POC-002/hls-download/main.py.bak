@@ -8,8 +8,8 @@ from collections import deque
 from utility import load_config, setup_logging, download_file, \
     parse_master_manifest, update_target_duration
 
-def download_and_update_manifest(playlists, subtitles, end_time, download_dir, thread_count,
-    segment_timeout, sleep_interval, subtitle_manifest_name, storage_type, s3_config):
+def download_and_update_manifest(playlists, subtitles, end_time, download_dir, thread_count, 
+    segment_timeout, sleep_interval, subtitle_manifest_name):
     task_queue = deque(playlists + subtitles)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=thread_count)
 
@@ -20,21 +20,21 @@ def download_and_update_manifest(playlists, subtitles, end_time, download_dir, t
             if isinstance(task, tuple) and len(task) == 2:
                 if task in playlists:
                     resolution, playlist_url = task
-                    futures.append(executor.submit(download_playlist, resolution,
-                        playlist_url, download_dir, segment_timeout, storage_type, s3_config))
+                    futures.append(executor.submit(download_playlist, resolution, 
+                        playlist_url, download_dir, segment_timeout))
                 elif task in subtitles:
                     language, subtitle_url = task
-                    futures.append(executor.submit(download_subtitle_playlist,
-                        subtitle_url, download_dir, language, subtitle_manifest_name, segment_timeout, storage_type, s3_config))
+                    futures.append(executor.submit(download_subtitle_playlist, 
+                        subtitle_url, download_dir, language, subtitle_manifest_name, segment_timeout))
             task_queue.append(task)
 
         # Wait for all tasks to complete
         concurrent.futures.wait(futures, timeout=segment_timeout)
-       
+        
         # Sleep only after completing one round of task submissions
         time.sleep(sleep_interval)
 
-def download_playlist(resolution, playlist_url, download_dir, segment_timeout, storage_type, s3_config):
+def download_playlist(resolution, playlist_url, download_dir, segment_timeout):
     try:
         response = requests.get(playlist_url, timeout=segment_timeout)
         response.raise_for_status()
@@ -68,8 +68,8 @@ def download_playlist(resolution, playlist_url, download_dir, segment_timeout, s
 
                     segment_url = urljoin(playlist_url, segment_line)
                     save_path = download_dir / resolution / segment_line
-                    download_tasks.append(executor.submit(download_file,
-                        segment_url, save_path, segment_timeout, storage_type, s3_config))
+                    download_tasks.append(executor.submit(download_file, 
+                        segment_url, save_path, segment_timeout))
                 elif line.startswith('#EXT-X-DATERANGE'):
                     new_manifest_content.append(line)
                 elif line.startswith('#EXT-X-CUE-OUT') or line.startswith('#EXT-X-CUE-IN'):
@@ -93,7 +93,7 @@ def download_playlist(resolution, playlist_url, download_dir, segment_timeout, s
     except Exception as e:
         logging.error(f"Unexpected error processing playlist {playlist_url}: {e}")
 
-def download_subtitle_playlist(subtitle_url, download_dir, language, subtitle_manifest_name, timeout, storage_type, s3_config):
+def download_subtitle_playlist(subtitle_url, download_dir, language, subtitle_manifest_name, timeout):
     try:
         subtitle_playlist_path = download_dir / language / subtitle_manifest_name
         subtitle_playlist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -113,8 +113,8 @@ def download_subtitle_playlist(subtitle_url, download_dir, language, subtitle_ma
                 if line and not line.startswith('#'):
                     subtitle_segment_url = urljoin(subtitle_url, line)
                     save_path = download_dir / language / line
-                    download_tasks.append(executor.submit(download_file,
-                        subtitle_segment_url, save_path, timeout, storage_type, s3_config))
+                    download_tasks.append(executor.submit(download_file, 
+                        subtitle_segment_url, save_path, timeout))
 
             for future in concurrent.futures.as_completed(download_tasks):
                 try:
@@ -136,24 +136,22 @@ def main():
     SLEEP_INTERVAL = config['sleep_interval_seconds'] # read the sleep interval
     MASTER_MANIFEST_NAME = config['master_manifest_name'] # read the master manifest name
     SUBTITLE_MANIFEST_NAME = config['subtitle_manifest_name'] # read the subtitle manifest name
-    STORAGE_TYPE = config['storage_type']  # 'local' or 's3'
-    S3_CONFIG = config.get('s3_config', {}) if STORAGE_TYPE == 's3' else None
 
     setup_logging(LOG_FILE) # setup logging is done here
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    logging.info("HLS downloader process started!!!\n\n\n")
+    logging.info("hls downloader process started!!!\n\n\n")
     start_time = time.time()
     end_time = start_time + DOWNLOAD_DURATION if config['download_duration_minutes'] > 0 else -1
 
-    playlists, subtitles, closed_captions = parse_master_manifest(HLS_URL,
+    playlists, subtitles, closed_captions = parse_master_manifest(HLS_URL, 
         DOWNLOAD_DIR, MASTER_MANIFEST_NAME)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
         futures = [
-            executor.submit(download_and_update_manifest, playlists, subtitles,
-                end_time, DOWNLOAD_DIR, THREAD_COUNT, SEGMENT_TIMEOUT,
-                SLEEP_INTERVAL, SUBTITLE_MANIFEST_NAME, STORAGE_TYPE, S3_CONFIG)
+            executor.submit(download_and_update_manifest, playlists, subtitles, 
+                end_time, DOWNLOAD_DIR, THREAD_COUNT, SEGMENT_TIMEOUT, 
+                SLEEP_INTERVAL, SUBTITLE_MANIFEST_NAME)
         ]
 
         for future in concurrent.futures.as_completed(futures):

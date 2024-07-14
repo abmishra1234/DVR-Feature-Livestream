@@ -1,6 +1,9 @@
 {
     "segments_dir": "../hls-download/hls_data",
     "subtitle_dir_eng": "../hls-download/hls_data/eng",
-    "enable_time_logging": false
+    "enable_time_logging": true,
+    "logging_dir": "logs",
+    "master_playlist_name": "playlist.m3u8",
+    "subtitle_playlist_name": "playlist_webvtt.m3u8"
 }
   
