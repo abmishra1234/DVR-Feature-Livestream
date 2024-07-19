@@ -42,6 +42,15 @@ class VTTMetadataManager:
     def get_live_playlist(self, language, max_segments=10):
         try:
             with self.lock:
+                if language not in self.segment_data:
+                    self.logger.error(f"No segment data found for resolution: {language}")
+                    return {"error": "No segment data found for the given language"}
+
+                if len(self.segment_data[language]) < 20:
+                    self.logger.info(f"Too few segments to return live subtitle playlist \
+                        for language {language}, so wait...")
+                    return {"error": "Too few segments to return, WAIT..."}
+
                 live_playlist = []
                 # Get the last 20 segments
                 start_idx = max(0, len(self.segment_data[language]) - 20)
@@ -62,8 +71,8 @@ class VTTMetadataManager:
                 return live_playlist
         except Exception as e:
             self.logger.error(f"Error getting live playlist: {e}")
-            return []
-
+            return {"error": f"Error getting live playlist: {e}"}
+        
     def get_dvr_playlist(self, language, date, timestamp, max_segments=10):
         try:
             with self.lock:

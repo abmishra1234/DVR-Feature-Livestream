@@ -39,31 +39,40 @@ class TSMetadataManager:
         except Exception as e:
             self.logger.error(f"Error removing segment: {e}")
 
-    def get_live_playlist(self, resolution, max_segments=10):
-        try:
-            with self.lock:
-                live_playlist = []
-                # Get the last 20 segments
-                start_idx = max(0, len(self.segment_data[resolution]) - 20)
-                last_segments = list(self.segment_data[resolution].items())[start_idx:]
-                # Fetch the first `max_segments` from the last segments
-                for i in range(min(max_segments, len(last_segments))):
-                    (date, end_timestamp), (sequence_number, start_timestamp, duration) = last_segments[i]
-                    ts_file = self.ts_files[resolution].get(sequence_number)
-                    live_playlist.append({
-                        "resolution": resolution,
-                        "sequence_number": sequence_number,
-                        "date": date,
-                        "start_timestamp": start_timestamp,
-                        "duration": duration,
-                        "ts_file": ts_file
-                    })
-                self.logger.info(f"Live playlist of last {max_segments} segments for resolution {resolution}: {live_playlist}")
-                return live_playlist
-        except Exception as e:
-            self.logger.error(f"Error getting live playlist: {e}")
-            return []
+def get_live_playlist(self, resolution, max_segments=10):
+    try:
+        with self.lock:
+            if resolution not in self.segment_data:
+                self.logger.error(f"No segment data found for resolution: {resolution}")
+                return {"error": "No segment data found for the given resolution"}
 
+            if len(self.segment_data[resolution]) < 20:
+                self.logger.info(f"Too few segments to return live playlist \
+					for resolution {resolution}, so wait...")
+                return {"error": "Too few segments to return, WAIT..."}
+
+            live_playlist = []
+            # Get the last 20 segments
+            start_idx = max(0, len(self.segment_data[resolution]) - 20)
+            last_segments = list(self.segment_data[resolution].items())[start_idx:]
+            # Fetch the first `max_segments` from the last segments
+            for i in range(min(max_segments, len(last_segments))):
+                (date, end_timestamp), (sequence_number, start_timestamp, duration) = last_segments[i]
+                ts_file = self.ts_files[resolution].get(sequence_number)
+                live_playlist.append({
+                    "resolution": resolution,
+                    "sequence_number": sequence_number,
+                    "date": date,
+                    "start_timestamp": start_timestamp,
+                    "duration": duration,
+                    "ts_file": ts_file
+                })
+            self.logger.info(f"Live playlist of last {max_segments} segments for resolution {resolution}: {live_playlist}")
+            return live_playlist
+    except Exception as e:
+        self.logger.error(f"Error getting live playlist: {e}")
+        return {"error": f"Error getting live playlist: {e}"}
+    
     def get_dvr_playlist(self, resolution, date, timestamp, max_segments=10):
         try:
             with self.lock:

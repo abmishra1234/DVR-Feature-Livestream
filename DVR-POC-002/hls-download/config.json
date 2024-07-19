@@ -8,10 +8,11 @@
     "sleep_interval_seconds": 0.5,
     "master_manifest_name": "playlist.m3u8",
     "subtitle_manifest_name": "playlist_webvtt.m3u8",
-    "storage_type": "s3",
+    "storage_type": "local",
     "s3_config": {
         "bucket_name": "poc.upload.dvr",
         "base_path": "hls_data/",
         "region_name": "ap-south-1"
-    }
+    },
+    "api_base_url": "http://localhost:8000"
 }

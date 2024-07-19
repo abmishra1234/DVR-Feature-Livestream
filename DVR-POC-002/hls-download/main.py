@@ -6,10 +6,13 @@ import requests
 from urllib.parse import urljoin
 from collections import deque
 from utility import load_config, setup_logging, download_file, \
-    parse_master_manifest, update_target_duration
+    parse_master_manifest, store_manifestfile
+
+from datetime import datetime, timedelta
 
 def download_and_update_manifest(playlists, subtitles, end_time, download_dir, thread_count,
-    segment_timeout, sleep_interval, subtitle_manifest_name, storage_type, s3_config):
+    segment_timeout, sleep_interval, subtitle_manifest_name, storage_type, s3_config,
+    api_base_url):
     task_queue = deque(playlists + subtitles)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=thread_count)
 
@@ -21,11 +24,12 @@ def download_and_update_manifest(playlists, subtitles, end_time, download_dir, t
                 if task in playlists:
                     resolution, playlist_url = task
                     futures.append(executor.submit(download_playlist, resolution,
-                        playlist_url, download_dir, segment_timeout, storage_type, s3_config))
+                        playlist_url, download_dir, segment_timeout, storage_type, s3_config, api_base_url))
                 elif task in subtitles:
                     language, subtitle_url = task
                     futures.append(executor.submit(download_subtitle_playlist,
-                        subtitle_url, download_dir, language, subtitle_manifest_name, segment_timeout, storage_type, s3_config))
+                        subtitle_url, download_dir, language, subtitle_manifest_name, segment_timeout, 
+                        storage_type, s3_config, api_base_url))
             task_queue.append(task)
 
         # Wait for all tasks to complete
@@ -34,46 +38,70 @@ def download_and_update_manifest(playlists, subtitles, end_time, download_dir, t
         # Sleep only after completing one round of task submissions
         time.sleep(sleep_interval)
 
-def download_playlist(resolution, playlist_url, download_dir, segment_timeout, storage_type, s3_config):
+def call_add_tsmetadata(metadata, api_base_url):
+    fastapi_url = f"{api_base_url}/add_tsmetadata"
+    try:
+        response = requests.post(fastapi_url, json=metadata)
+        response.raise_for_status()
+        logging.info(f"Successfully added metadata: {metadata}")
+    except requests.RequestException as e:
+        logging.error(f"Failed to add TS metadata: {e}")
+
+def adjust_datetime(start_time, duration):
+    adjusted_time = start_time + timedelta(seconds=duration)
+    return adjusted_time
+
+def download_playlist(resolution, playlist_url, download_dir, segment_timeout, storage_type, s3_config, api_base_url):
     try:
         response = requests.get(playlist_url, timeout=segment_timeout)
         response.raise_for_status()
         playlist_content = response.text
 
-        playlist_path = download_dir / resolution / f'playlist_{resolution}.m3u8'
-        playlist_path.parent.mkdir(parents=True, exist_ok=True)
+        playlist_path = Path(download_dir) / resolution / f'playlist_{resolution}.m3u8'
+        store_manifestfile(playlist_content, playlist_path, storage_type, s3_config)
 
         lines = playlist_content.splitlines()
-        max_duration = 0
-        new_manifest_content = ['#EXTM3U', '#EXT-X-VERSION:3']
         download_tasks = []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            for i in range(len(lines)):
-                line = lines[i]
-                if line.startswith('#EXT-X-TARGETDURATION'):
-                    new_manifest_content.append(line)
-                elif line.startswith('#EXT-X-MEDIA-SEQUENCE'):
-                    new_manifest_content.append(line)
-                elif line.startswith('#EXT-X-PROGRAM-DATE-TIME'):
-                    new_manifest_content.append(line)
-                elif line.startswith('#EXTINF'):
-                    duration = float(line.split(':')[1].strip(','))
-                    if duration > max_duration:
-                        max_duration = duration
+        start_time = None
 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            for i, line in enumerate(lines):
+                if line.startswith('#EXTINF'):
+                    duration = float(line.split(':')[1].strip(','))
                     segment_line = lines[i + 1] if (i + 1) < len(lines) else ""
-                    new_manifest_content.append(line)
-                    new_manifest_content.append(segment_line)
 
                     segment_url = urljoin(playlist_url, segment_line)
-                    save_path = download_dir / resolution / segment_line
-                    download_tasks.append(executor.submit(download_file,
-                        segment_url, save_path, segment_timeout, storage_type, s3_config))
-                elif line.startswith('#EXT-X-DATERANGE'):
-                    new_manifest_content.append(line)
-                elif line.startswith('#EXT-X-CUE-OUT') or line.startswith('#EXT-X-CUE-IN'):
-                    new_manifest_content.append(line)
+                    save_path = Path(download_dir) / resolution / segment_line
+                    download_tasks.append(executor.submit(download_file, segment_url, save_path, segment_timeout, storage_type, s3_config))
+
+                    # Extract sequence number from segment file name
+                    sequence_number = int(segment_line.split('__')[-1].split('.')[0])
+
+                    # Extract or calculate the start time
+                    if start_time is None:
+                        if any('#EXT-X-PROGRAM-DATE-TIME' in l for l in lines):
+                            start_time_str = next(l.split(':')[1] for l in lines if '#EXT-X-PROGRAM-DATE-TIME' in l)
+                            start_time = datetime.fromisoformat(start_time_str.rstrip('Z'))
+                        else:
+                            # Fallback to current time if no program date time is provided
+                            start_time = datetime.utcnow()  
+
+                    # Prepare metadata for each segment
+                    metadata = {
+                        "resolution": resolution,
+                        "date": start_time.date().isoformat(),
+                        "start_timestamp": start_time.strftime("%H:%M:%S.%f")[:-3],
+                        "sequence_number": sequence_number,
+                        "duration": duration,
+                        "ts_file": segment_line
+                    }
+                   
+                    # Call the FastAPI endpoint to add TS metadata
+                    executor.submit(call_add_tsmetadata, metadata, api_base_url)
+                   
+                    # Increment start time by the duration of the segment
+                    start_time = adjust_datetime(start_time, duration)
 
             for future in concurrent.futures.as_completed(download_tasks):
                 try:
@@ -81,40 +109,73 @@ def download_playlist(resolution, playlist_url, download_dir, segment_timeout, s
                 except Exception as e:
                     logging.error(f"Error in downloading segment: {e}")
 
-        with open(playlist_path, 'w') as file:
-            file.write('\n'.join(new_manifest_content))
-
-        update_target_duration(playlist_path, max_duration)
-
-        logging.info(f"Updated playlist with latest segments: {playlist_path}")
-
     except requests.RequestException as e:
         logging.error(f"Failed to download playlist: {playlist_url}, error: {e}")
     except Exception as e:
         logging.error(f"Unexpected error processing playlist {playlist_url}: {e}")
-
-def download_subtitle_playlist(subtitle_url, download_dir, language, subtitle_manifest_name, timeout, storage_type, s3_config):
+        
+def call_add_vttmetadata(metadata, api_base_url):
+    fastapi_url = f"{api_base_url}/add_vttmetadata"
     try:
-        subtitle_playlist_path = download_dir / language / subtitle_manifest_name
-        subtitle_playlist_path.parent.mkdir(parents=True, exist_ok=True)
+        response = requests.post(fastapi_url, json=metadata)
+        response.raise_for_status()
+        logging.info(f"Successfully added VTT metadata: {metadata}")
+    except requests.RequestException as e:
+        logging.error(f"Failed to add VTT metadata: {e}")
+
+def download_subtitle_playlist(subtitle_url, download_dir, language, 
+    subtitle_manifest_name, timeout, storage_type, s3_config, api_base_url):
+    try:
+        subtitle_playlist_path = Path(download_dir) / language / subtitle_manifest_name
         response = requests.get(subtitle_url, timeout=timeout)
         response.raise_for_status()
         subtitle_content = response.text
 
-        with open(subtitle_playlist_path, 'w') as file:
-            file.write(subtitle_content)
-
-        logging.info(f"Downloaded and updated subtitle playlist: {subtitle_playlist_path}")
+        store_manifestfile(subtitle_content, subtitle_playlist_path, 
+            storage_type, s3_config)
 
         lines = subtitle_content.splitlines()
         download_tasks = []
+        start_time = None
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            for line in lines:
-                if line and not line.startswith('#'):
-                    subtitle_segment_url = urljoin(subtitle_url, line)
-                    save_path = download_dir / language / line
-                    download_tasks.append(executor.submit(download_file,
+            for i, line in enumerate(lines):
+                if line.startswith('#EXTINF'):
+                    duration = float(line.split(':')[1].strip(','))
+                   
+                    segment_line = lines[i + 1] if (i + 1) < len(lines) else ""
+                    subtitle_segment_url = urljoin(subtitle_url, segment_line)
+                    save_path = Path(download_dir) / language / segment_line
+                    download_tasks.append(executor.submit(download_file, 
                         subtitle_segment_url, save_path, timeout, storage_type, s3_config))
+
+                    # Extract sequence number from segment file name
+                    sequence_number = int(segment_line.split('__')[-1].split('.')[0])
+
+                    # Extract or calculate the start time
+                    if start_time is None:
+                        if any('#EXT-X-PROGRAM-DATE-TIME' in l for l in lines):
+                            start_time_str = next(l.split(':')[1] for l in lines if '#EXT-X-PROGRAM-DATE-TIME' in l)
+                            start_time = datetime.fromisoformat(start_time_str.rstrip('Z'))
+                        else:
+                            # Fallback to current time if no program date time is provided                            
+                            start_time = datetime.utcnow()
+
+                    # Prepare metadata for each segment
+                    metadata = {
+                        "language": language,
+                        "date": start_time.date().isoformat(),
+                        "start_timestamp": start_time.strftime("%H:%M:%S.%f")[:-3],
+                        "sequence_number": sequence_number,
+                        "duration": duration,
+                        "vtt_file": segment_line
+                    }
+                   
+                    # Call the FastAPI endpoint to add VTT metadata
+                    executor.submit(call_add_vttmetadata, metadata, api_base_url)
+                   
+                    # Increment start time by the duration of the segment
+                    start_time = adjust_datetime(start_time, duration)
 
             for future in concurrent.futures.as_completed(download_tasks):
                 try:
@@ -124,6 +185,8 @@ def download_subtitle_playlist(subtitle_url, download_dir, language, subtitle_ma
 
     except requests.RequestException as e:
         logging.error(f"Failed to download subtitle playlist: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error processing subtitle playlist {subtitle_url}: {e}")
 
 def main():
     config = load_config()
@@ -138,6 +201,7 @@ def main():
     SUBTITLE_MANIFEST_NAME = config['subtitle_manifest_name'] # read the subtitle manifest name
     STORAGE_TYPE = config['storage_type']  # 'local' or 's3'
     S3_CONFIG = config.get('s3_config', {}) if STORAGE_TYPE == 's3' else None
+    API_BASE_URL = config['api_base_url']
 
     setup_logging(LOG_FILE) # setup logging is done here
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -147,13 +211,12 @@ def main():
     end_time = start_time + DOWNLOAD_DURATION if config['download_duration_minutes'] > 0 else -1
 
     playlists, subtitles, closed_captions = parse_master_manifest(HLS_URL,
-        DOWNLOAD_DIR, MASTER_MANIFEST_NAME)
-
+        DOWNLOAD_DIR, MASTER_MANIFEST_NAME, STORAGE_TYPE, S3_CONFIG)
     with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
         futures = [
             executor.submit(download_and_update_manifest, playlists, subtitles,
                 end_time, DOWNLOAD_DIR, THREAD_COUNT, SEGMENT_TIMEOUT,
-                SLEEP_INTERVAL, SUBTITLE_MANIFEST_NAME, STORAGE_TYPE, S3_CONFIG)
+                SLEEP_INTERVAL, SUBTITLE_MANIFEST_NAME, STORAGE_TYPE, S3_CONFIG, API_BASE_URL)
         ]
 
         for future in concurrent.futures.as_completed(futures):

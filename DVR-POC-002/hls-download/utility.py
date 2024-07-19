@@ -43,12 +43,8 @@ def get_s3_client(s3_config):
         logging.error(f"Failed to create S3 client: {e}")
         raise
 
-def download_file(url, save_path, timeout, storage_type, s3_config=None):
+def store_binaryfile(content, save_path, storage_type, s3_config=None):
     try:
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-        content = response.content
-
         if storage_type == 'local':
             save_path.parent.mkdir(parents=True, exist_ok=True)
             with open(save_path, 'wb') as file:
@@ -71,20 +67,66 @@ def download_file(url, save_path, timeout, storage_type, s3_config=None):
         else:
             logging.error("Invalid storage type or missing S3 configuration")
             raise ValueError("Invalid storage type or missing S3 configuration")
-        
-        # TBD, abinash.km : Add your Fast API call at this place, so that it will work well
+    except (BotoCoreError, ClientError) as e:
+        logging.error(f"Failed to upload to S3: {e}")
+        raise
+    except OSError as e:
+        logging.error(f"OS error when saving file {save_path}: {e}")
+        raise
 
+def download_file(url, save_path, timeout, storage_type, s3_config=None):
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        content = response.content
+
+        store_binaryfile(content, save_path, storage_type, s3_config)
+        # Add the Fast API Call for adding metadata
+        # 
+       
     except requests.Timeout:
         logging.error(f"Timeout occurred while downloading {url}")
     except requests.RequestException as e:
         logging.error(f"Failed to download {url}: {e}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+
+def store_manifestfile(content, save_path, storage_type, s3_config=None, master=False):
+    try:
+        if storage_type == 'local':
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(save_path, 'w') as file:
+                file.write(content)
+            logging.info(f"Downloaded Manifest file: {save_path}")
+
+        elif storage_type == 's3' and s3_config:
+            s3_client = get_s3_client(s3_config)
+
+            # Extract the directory and filename
+            directory = save_path.parent.name
+            filename = save_path.name
+
+            # Construct the S3 key
+            if master:
+                s3_key = f"{filename}"
+            else:
+                s3_key = f"{directory}/{filename}"
+
+            s3_client.put_object(Bucket=s3_config['bucket_name'], Key=s3_key, Body=content)
+            logging.info(f"Uploaded Manifest file to S3: {s3_key}")
+
+        else:
+            logging.error("Invalid storage type or missing S3 configuration")
+            raise ValueError("Invalid storage type or missing S3 configuration")
     except (BotoCoreError, ClientError) as e:
         logging.error(f"Failed to upload to S3: {e}")
+        raise
     except OSError as e:
         logging.error(f"OS error when saving file {save_path}: {e}")
+        raise
 
-
-def parse_master_manifest(url, download_dir, master_manifest_name):
+def parse_master_manifest(url, download_dir, master_manifest_name, 
+    storage_type, s3_config=None):
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -94,11 +136,8 @@ def parse_master_manifest(url, download_dir, master_manifest_name):
         raise
 
     master_manifest_path = download_dir / master_manifest_name
-    master_manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    # alt+ctrl+k
-    with open(master_manifest_path, 'w') as file:
-        file.write(manifest_content)
-    logging.info(f"Downloaded master manifest: {master_manifest_path}")
+    # called the utility method created for handling master playlist download/upload
+    store_manifestfile(manifest_content, master_manifest_path, storage_type, s3_config, True)
 
     playlists, subtitles, closed_captions = [], [], []
     manifest_lines = manifest_content.splitlines()

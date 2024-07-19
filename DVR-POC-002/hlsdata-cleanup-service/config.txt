@@ -1,0 +1,7 @@
+{
+    "directory": "../hls-download/hls_data", # path from where we have to delete the files
+    "retention_period": 35, # this is the threshold time limit, delted anything beyond
+    "polling_interval": 600, # time gap between the service to be executed
+    "exception_list": ["playlist.m3u8"], # Exception list meaning this is not to be cleaned
+    "api_base_url": "http://localhost:8000" # This is the Fast API Endpoint, need to be replaced with cloud based later
+}

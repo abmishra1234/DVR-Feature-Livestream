@@ -73,6 +73,7 @@ logger.addHandler(handler)
 
 app = FastAPI()
 
+######################Handling for CORS Calling Error#########
 # Allow CORS
 app.add_middleware(
     CORSMiddleware,
@@ -81,6 +82,7 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+######################Handling Ends here#####################
 
 # Thread pool for blocking IO operations, go with default number of workers
 executor = ThreadPoolExecutor(max_workers=10)
